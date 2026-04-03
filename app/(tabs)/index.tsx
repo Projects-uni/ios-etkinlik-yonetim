@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 
 const categories = ['Tümü', 'Konser', 'Konferans', 'Spor', 'Festival', 'Atölye', 'Diğer'] as const;
 
+
 type EventItem = {
   id: string;
   title: string;
@@ -71,7 +72,6 @@ function getStatusColors(status: string) {
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
   const { width } = useWindowDimensions();
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>('Tümü');
   const [searchText, setSearchText] = useState('');
@@ -137,7 +137,7 @@ export default function HomeScreen() {
       const user = userData.user ?? sessionData.session?.user;
 
       if (!user) {
-        router.replace('/');
+        setDisplayName('kullanıcı');
         return;
       }
 
@@ -158,7 +158,7 @@ export default function HomeScreen() {
       }
 
       if (!session) {
-        router.replace('/');
+        setDisplayName('kullanıcı');
         return;
       }
 
@@ -173,7 +173,7 @@ export default function HomeScreen() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = searchText.trim().toLocaleLowerCase('tr-TR');
@@ -191,14 +191,17 @@ export default function HomeScreen() {
     });
   }, [activeCategory, events, searchText]);
 
+  const router = useRouter();
+
+
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert('Çıkış başarısız', error.message);
-      return;
-    }
-    router.replace('/');
-  };
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    Alert.alert('Çıkış başarısız', error.message);
+    return;
+  }
+  router.replace('/'); // 👈 force navigate to auth screen
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>

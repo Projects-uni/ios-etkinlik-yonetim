@@ -110,7 +110,6 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
           options: { data: { full_name: fullName.trim() } },
         });
         if (error) throw error;
-        Alert.alert('E-postanızı kontrol edin', 'Hesabınız oluşturuldu. Devam etmek için e-postanızı onaylayın.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
