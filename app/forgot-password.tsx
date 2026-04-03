@@ -15,13 +15,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getResetPasswordRedirectUrl } from '@/lib/get-reset-password-redirect-url';
 import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const resetPasswordUrl = process.env.EXPO_PUBLIC_RESET_PASSWORD_URL;
+  const resetPasswordUrl = getResetPasswordRedirectUrl();
 
   const handleSendLink = async () => {
     if (!email.trim()) {
@@ -50,7 +51,7 @@ export default function ForgotPasswordScreen() {
 
       Alert.alert(
         'Bağlantı gönderildi',
-        'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. E-postadaki bağlantı tarayıcıda açılacak.',
+        'Kayıtlı bir hesap varsa şifre sıfırlama e-postası birkaç dakika içinde gelir. Spam/gereksiz klasörüne de bakın. Hiç gelmezse bu adresle kayıtlı kullanıcı olmayabilir veya e-posta gecikmiş olabilir.',
         [{ text: 'Tamam', onPress: () => router.back() }]
       );
     } catch (error) {

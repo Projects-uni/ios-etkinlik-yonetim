@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Session } from '@supabase/supabase-js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { isPasswordRecoverySession } from '@/lib/is-password-recovery-session';
 import { supabase } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'signup';
@@ -36,17 +37,48 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const passwordRecoveryHandledRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) setSession(data.session);
-    });
+    const routeToPasswordReset = () => {
+      passwordRecoveryHandledRef.current = true;
+      router.replace('/reset-password');
+    };
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (event === 'PASSWORD_RECOVERY') {
+        routeToPasswordReset();
+        return;
+      }
+
+      // INITIAL_SESSION runs before PASSWORD_RECOVERY's macrotask; defer so recovery redirect wins.
+      if (event === 'INITIAL_SESSION') {
+        setTimeout(() => {
+          if (!isMounted || passwordRecoveryHandledRef.current) {
+            return;
+          }
+          if (isPasswordRecoverySession(nextSession)) {
+            routeToPasswordReset();
+            return;
+          }
+          setSession(nextSession);
+        }, 0);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && isPasswordRecoverySession(nextSession)) {
+        routeToPasswordReset();
+        return;
+      }
+
       setSession(nextSession);
     });
 
@@ -54,7 +86,13 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
+
+  useEffect(() => {
+    if (session) {
+      router.replace('/(tabs)');
+    }
+  }, [router, session]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim() || (isSignup && !fullName.trim())) {

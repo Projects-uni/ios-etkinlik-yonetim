@@ -87,7 +87,7 @@ export default function ResetPasswordScreen() {
       Alert.alert('Hata', error.message);
     } else {
       await supabase.auth.signOut();
-      Alert.alert('Başarılı', 'Şifreniz güncellendi. Lütfen giriş yapın.', [
+      Alert.alert('Başarılı', 'Parola başarılı şekilde değiştirildi.', [
         { text: 'Tamam', onPress: () => router.replace('/') },
       ]);
     }

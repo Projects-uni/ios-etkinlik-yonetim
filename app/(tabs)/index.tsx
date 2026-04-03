@@ -1,98 +1,279 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const categories = ['Tümü', 'Konser', 'Konferans', 'Spor', 'Festival', 'Atölye'];
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const [activeCategory, setActiveCategory] = useState('Tümü');
+  const scale = Math.min(Math.max(width / 390, 0.88), 1.12);
+  const spacing = {
+    horizontal: Math.round(20 * scale),
+    searchHeight: Math.round(54 * scale),
+    chipHorizontal: Math.round(18 * scale),
+    chipVertical: Math.round(10 * scale),
+  };
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  // Events will come from backend after event-create flow is completed.
+  const featuredEvents = useMemo(() => [] as Array<unknown>, []);
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('Çıkış başarısız', error.message);
+      return;
+    }
+    router.replace('/');
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingHorizontal: spacing.horizontal }]}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextWrap}>
+            <Text style={[styles.title, { fontSize: Math.round(30 * scale) }]}>EventHub</Text>
+            <Text style={[styles.subtitle, { fontSize: Math.round(15 * scale) }]}>
+              Yakındaki etkinlikleri keşfet
+            </Text>
+          </View>
+          <Pressable
+            style={[styles.iconButton, { width: 40 * scale, height: 40 * scale }]}
+            onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={Math.round(20 * scale)} color="#4B5563" />
+          </Pressable>
+        </View>
+
+        <View style={[styles.searchWrap, { height: spacing.searchHeight, borderRadius: spacing.searchHeight / 2 }]}>
+          <Ionicons name="search-outline" size={Math.round(20 * scale)} color="#94A3B8" />
+          <TextInput
+            placeholder="Etkinlik ara..."
+            placeholderTextColor="#94A3B8"
+            style={[styles.searchInput, { fontSize: Math.round(16 * scale) }]}
+          />
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}>
+          {categories.map((category) => {
+            const isActive = activeCategory === category;
+            return (
+              <Pressable
+                key={category}
+                onPress={() => setActiveCategory(category)}
+                style={styles.categoryItem}>
+                {isActive ? (
+                  <LinearGradient
+                    colors={['#3B82F6', '#4F46E5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[
+                      styles.categoryPillActive,
+                      {
+                        borderRadius: Math.round(22 * scale),
+                        paddingHorizontal: spacing.chipHorizontal,
+                        paddingVertical: spacing.chipVertical,
+                      },
+                    ]}>
+                    <Text style={[styles.categoryTextActive, { fontSize: Math.round(15 * scale) }]}>
+                      {category}
+                    </Text>
+                  </LinearGradient>
+                ) : (
+                  <View
+                    style={[
+                      styles.categoryPill,
+                      {
+                        borderRadius: Math.round(22 * scale),
+                        paddingHorizontal: spacing.chipHorizontal,
+                        paddingVertical: spacing.chipVertical,
+                      },
+                    ]}>
+                    <Text style={[styles.categoryText, { fontSize: Math.round(15 * scale) }]}>{category}</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { fontSize: Math.round(30 * scale) }]}>Öne Çıkan Etkinlikler</Text>
+          <Pressable>
+            <Text style={[styles.sectionAction, { fontSize: Math.round(16 * scale) }]}>Tümünü Gör</Text>
+          </Pressable>
+        </View>
+
+        {featuredEvents.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <LinearGradient
+              colors={['#EEF2FF', '#E0E7FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                styles.emptyIconWrap,
+                {
+                  width: Math.round(72 * scale),
+                  height: Math.round(72 * scale),
+                  borderRadius: Math.round(20 * scale),
+                },
+              ]}>
+              <Ionicons name="calendar-outline" size={Math.round(30 * scale)} color="#4F46E5" />
+            </LinearGradient>
+            <Text style={[styles.emptyTitle, { fontSize: Math.round(22 * scale) }]}>Henüz etkinlik yok</Text>
+            <Text style={[styles.emptyText, { fontSize: Math.round(15 * scale), lineHeight: Math.round(22 * scale) }]}>
+              Etkinlik oluşturma kısmı tamamlandığında burada listelenecek.
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  content: {
+    paddingTop: 10,
+    paddingBottom: 28,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  headerTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  title: {
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.8,
+  },
+  subtitle: {
+    marginTop: 2,
+    fontSize: 18,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  iconButton: {
+    borderRadius: 999,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchWrap: {
+    height: 54,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
-  stepContainer: {
-    gap: 8,
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 18,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  categoryRow: {
+    paddingBottom: 14,
+    gap: 10,
+  },
+  categoryItem: {
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  categoryPill: {
+    backgroundColor: '#E5E7EB',
+  },
+  categoryPillActive: {
+  },
+  categoryText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  categoryTextActive: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sectionHeader: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.6,
+  },
+  sectionAction: {
+    color: '#3B82F6',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  emptyCard: {
+    marginTop: 8,
+    borderRadius: 26,
+    paddingVertical: 30,
+    paddingHorizontal: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  emptyText: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
