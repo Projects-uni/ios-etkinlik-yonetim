@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Session } from '@supabase/supabase-js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -31,7 +30,6 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const isSignup = mode === 'signup';
 
-  const [session, setSession] = useState<Session | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,9 +65,7 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
           }
           if (isPasswordRecoverySession(nextSession)) {
             routeToPasswordReset();
-            return;
           }
-          setSession(nextSession);
         }, 0);
         return;
       }
@@ -78,8 +74,6 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
         routeToPasswordReset();
         return;
       }
-
-      setSession(nextSession);
     });
 
     return () => {
@@ -87,12 +81,6 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
       subscription.unsubscribe();
     };
   }, [router]);
-
-  useEffect(() => {
-    if (session) {
-      router.replace('/(tabs)');
-    }
-  }, [router, session]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim() || (isSignup && !fullName.trim())) {
@@ -123,11 +111,6 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) Alert.alert('Çıkış başarısız', error.message);
   };
 
   const switchMode = (next: AuthMode) => {
@@ -165,18 +148,7 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
 
           {/* Card */}
           <View style={styles.card}>
-
-            {session ? (
-              <View style={styles.sessionBox}>
-                <Ionicons name="checkmark-circle" size={52} color="#5B6CF6" />
-                <Text style={styles.sessionTitle}>Giriş yapıldı</Text>
-                <Text style={styles.sessionEmail}>{session.user.email}</Text>
-                <Pressable onPress={handleSignOut} style={styles.signOutButton}>
-                  <Text style={styles.signOutText}>Çıkış Yap</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <>
+            <>
                 {/* Tab Toggle */}
                 <View style={styles.tabRow}>
                   <Pressable
@@ -299,8 +271,7 @@ export function AuthScreen({ mode: initialMode = 'login' }: AuthScreenProps) {
                     )}
                   </LinearGradient>
                 </Pressable>
-              </>
-            )}
+            </>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -327,11 +298,15 @@ const styles = StyleSheet.create({
   // App Icon
   iconWrapper: {
     marginBottom: 20,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 16px rgba(124, 58, 237, 0.3)' }
+      : {
+          shadowColor: '#7C3AED',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 16,
+          elevation: 8,
+        }),
   },
   iconGradient: {
     width: 88,
@@ -356,11 +331,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
     padding: 22,
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 24px rgba(30, 58, 138, 0.08)' }
+      : {
+          shadowColor: '#1E3A8A',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.08,
+          shadowRadius: 24,
+          elevation: 4,
+        }),
   },
 
   // Tab Toggle
@@ -445,11 +424,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 4,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 6px 12px rgba(124, 58, 237, 0.35)' }
+      : {
+          shadowColor: '#7C3AED',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.35,
+          shadowRadius: 12,
+          elevation: 6,
+        }),
   },
   submitGradient: {
     paddingVertical: 18,

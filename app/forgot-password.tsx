@@ -149,11 +149,15 @@ const styles = StyleSheet.create({
   iconWrapper: {
     alignSelf: 'center',
     marginBottom: 20,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 16px rgba(124, 58, 237, 0.3)' }
+      : {
+          shadowColor: '#7C3AED',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 16,
+          elevation: 8,
+        }),
   },
   iconGradient: {
     width: 80,
@@ -179,11 +183,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 28,
     padding: 22,
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 24px rgba(30, 58, 138, 0.08)' }
+      : {
+          shadowColor: '#1E3A8A',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.08,
+          shadowRadius: 24,
+          elevation: 4,
+        }),
   },
   label: {
     fontSize: 14,
@@ -211,11 +219,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 22,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 6px 12px rgba(124, 58, 237, 0.35)' }
+      : {
+          shadowColor: '#7C3AED',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.35,
+          shadowRadius: 12,
+          elevation: 6,
+        }),
   },
   submitGradient: {
     paddingVertical: 18,

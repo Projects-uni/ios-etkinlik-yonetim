@@ -36,6 +36,12 @@ type TaskDraft = {
   dueDate: Date | null;
 };
 
+type UserLookupRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+};
+
 function formatDate(date: Date | null) {
   if (!date) {
     return 'Tarih seç';
@@ -59,6 +65,20 @@ function createTaskDraft(): TaskDraft {
     status: 'Beklemede',
     dueDate: null,
   };
+}
+
+async function findUserByEmail(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data, error } = await supabase.rpc('find_user_by_email', {
+    input_email: normalizedEmail,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const [user] = (data ?? []) as UserLookupRow[];
+  return user ?? null;
 }
 
 export default function EventCreationScreen() {
@@ -219,6 +239,43 @@ export default function EventCreationScreen() {
         throw new Error('Bütçe alanına sayısal bir değer girin.');
       }
 
+      const resolvedTasks = await Promise.all(
+        validTasks.map(async (task) => {
+          const assignedUser = await findUserByEmail(task.assignedTo);
+
+          if (!assignedUser) {
+            throw new Error(`"${task.assignedTo}" için kullanıcı bulunamadı.`);
+          }
+
+          return {
+            event_id: '',
+            title: task.title,
+            description: task.description,
+            due_date: task.dueDate?.toISOString(),
+            assigned_to: assignedUser.email,
+            assigned_to_user_id: assignedUser.id,
+            status: task.status,
+          };
+        })
+      );
+
+      const resolvedParticipants = await Promise.all(
+        participants.map(async (email) => {
+          const participantUser = await findUserByEmail(email);
+
+          if (!participantUser) {
+            throw new Error(`"${email}" için kullanıcı bulunamadı.`);
+          }
+
+          return {
+            event_id: '',
+            email: participantUser.email,
+            participant_user_id: participantUser.id,
+            invited_by: user.id,
+          };
+        })
+      );
+
       const { data: event, error: eventError } = await supabase
         .from('events')
         .insert({
@@ -238,15 +295,11 @@ export default function EventCreationScreen() {
         throw eventError;
       }
 
-      if (validTasks.length > 0) {
+      if (resolvedTasks.length > 0) {
         const { error: tasksError } = await supabase.from('tasks').insert(
-          validTasks.map((task) => ({
+          resolvedTasks.map((task) => ({
+            ...task,
             event_id: event.id,
-            title: task.title,
-            description: task.description,
-            due_date: task.dueDate?.toISOString(),
-            assigned_to: task.assignedTo,
-            status: task.status,
           }))
         );
 
@@ -255,12 +308,11 @@ export default function EventCreationScreen() {
         }
       }
 
-      if (participants.length > 0) {
+      if (resolvedParticipants.length > 0) {
         const { error: participantsError } = await supabase.from('event_participants').insert(
-          participants.map((email) => ({
+          resolvedParticipants.map((participant) => ({
+            ...participant,
             event_id: event.id,
-            email,
-            invited_by: user.id,
           }))
         );
 
@@ -272,11 +324,23 @@ export default function EventCreationScreen() {
       resetForm();
       Alert.alert('Başarılı', 'Etkinlik, görevler ve katılımcı davetleri kaydedildi.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Bir hata oluştu.';
-      Alert.alert('Kayıt başarısız', message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  console.log('FULL ERROR:', error); // logs everything
+
+  let message = 'Bir hata oluştu.';
+
+  if (error instanceof Error) {
+    message = error.message;
+    console.log('STACK:', error.stack); // optional, but useful
+  } else if (typeof error === 'string') {
+    message = error;
+  } else {
+    message = JSON.stringify(error); // fallback for weird cases
+  }
+
+  Alert.alert('Kayıt başarısız', message);
+} finally {
+  setIsSubmitting(false);
+}
   };
 
   return (
