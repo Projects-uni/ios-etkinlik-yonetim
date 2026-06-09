@@ -1,0 +1,18 @@
+# Supabase local / deploy configuration
+# Docs: https://supabase.com/docs/guides/functions
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[functions]
+# JWT is verified by default for each function (requires Authorization: Bearer <token>)
+
+[functions.list-events]
+verify_jwt = true
+
+[functions.list-my-participant-statuses]
+verify_jwt = true

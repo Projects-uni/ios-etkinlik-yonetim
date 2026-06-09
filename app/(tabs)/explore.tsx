@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { createEvent } from '@/lib/api/events';
 import { supabase } from '@/lib/supabase';
 
 const eventCategories = ['Konser', 'Konferans', 'Spor', 'Festival', 'Atölye', 'Diğer'] as const;
@@ -34,12 +35,6 @@ type TaskDraft = {
   assignedTo: string;
   status: TaskStatus;
   dueDate: Date | null;
-};
-
-type UserLookupRow = {
-  id: string;
-  email: string;
-  full_name: string | null;
 };
 
 function formatDate(date: Date | null) {
@@ -65,20 +60,6 @@ function createTaskDraft(): TaskDraft {
     status: 'Beklemede',
     dueDate: null,
   };
-}
-
-async function findUserByEmail(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await supabase.rpc('find_user_by_email', {
-    input_email: normalizedEmail,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const [user] = (data ?? []) as UserLookupRow[];
-  return user ?? null;
 }
 
 export default function EventCreationScreen() {
@@ -239,87 +220,23 @@ export default function EventCreationScreen() {
         throw new Error('Bütçe alanına sayısal bir değer girin.');
       }
 
-      const resolvedTasks = await Promise.all(
-        validTasks.map(async (task) => {
-          const assignedUser = await findUserByEmail(task.assignedTo);
-
-          if (!assignedUser) {
-            throw new Error(`"${task.assignedTo}" için kullanıcı bulunamadı.`);
-          }
-
-          return {
-            event_id: '',
-            title: task.title,
-            description: task.description,
-            due_date: task.dueDate?.toISOString(),
-            assigned_to: assignedUser.email,
-            assigned_to_user_id: assignedUser.id,
-            status: task.status,
-          };
-        })
-      );
-
-      const resolvedParticipants = await Promise.all(
-        participants.map(async (email) => {
-          const participantUser = await findUserByEmail(email);
-
-          if (!participantUser) {
-            throw new Error(`"${email}" için kullanıcı bulunamadı.`);
-          }
-
-          return {
-            event_id: '',
-            email: participantUser.email,
-            participant_user_id: participantUser.id,
-            invited_by: user.id,
-          };
-        })
-      );
-
-      const { data: event, error: eventError } = await supabase
-        .from('events')
-        .insert({
-          organizer_id: user.id,
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          category,
-          status,
-          event_date: eventDate.toISOString(),
-          budget: parsedBudget,
-        })
-        .select('id')
-        .single();
-
-      if (eventError) {
-        throw eventError;
-      }
-
-      if (resolvedTasks.length > 0) {
-        const { error: tasksError } = await supabase.from('tasks').insert(
-          resolvedTasks.map((task) => ({
-            ...task,
-            event_id: event.id,
-          }))
-        );
-
-        if (tasksError) {
-          throw tasksError;
-        }
-      }
-
-      if (resolvedParticipants.length > 0) {
-        const { error: participantsError } = await supabase.from('event_participants').insert(
-          resolvedParticipants.map((participant) => ({
-            ...participant,
-            event_id: event.id,
-          }))
-        );
-
-        if (participantsError) {
-          throw participantsError;
-        }
-      }
+      await createEvent({
+        title: title.trim(),
+        description: description.trim(),
+        location: location.trim(),
+        category,
+        status,
+        event_date: eventDate.toISOString(),
+        budget: parsedBudget,
+        tasks: validTasks.map((task) => ({
+          title: task.title,
+          description: task.description,
+          assigned_to_email: task.assignedTo,
+          status: task.status,
+          due_date: task.dueDate!.toISOString(),
+        })),
+        participant_emails: participants,
+      });
 
       resetForm();
       Alert.alert('Başarılı', 'Etkinlik, görevler ve katılımcı davetleri kaydedildi.');

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import '@/components/auth-screen';
 
+import {
+  deleteEvent as deleteEventApi,
+  getEventDetails,
+  listEvents,
+  listMyParticipantStatuses,
+  respondToInvitation,
+  updateEvent,
+} from '@/lib/api/events';
+import { createParticipant, deleteParticipant, updateParticipant } from '@/lib/api/participants';
+import { createTask, deleteTask, updateTask } from '@/lib/api/tasks';
 import { supabase } from '@/lib/supabase';
 
 const categories = ['Tümü', 'Konser', 'Konferans', 'Spor', 'Festival', 'Atölye', 'Diğer'] as const;
@@ -94,12 +104,6 @@ type ParticipantEditFormState = {
 type CurrentUser = {
   id: string;
   email: string;
-};
-
-type UserLookupRow = {
-  id: string;
-  email: string;
-  full_name: string | null;
 };
 
 function formatEventDate(dateString: string) {
@@ -181,20 +185,6 @@ function createTaskEditFormState(task: EventTask): TaskEditFormState {
   };
 }
 
-async function findUserByEmail(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await supabase.rpc('find_user_by_email', {
-    input_email: normalizedEmail,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const [user] = (data ?? []) as UserLookupRow[];
-  return user ?? null;
-}
-
 function createParticipantEditFormState(participant: EventParticipant): ParticipantEditFormState {
   return {
     email: participant.email,
@@ -220,6 +210,7 @@ function createEmptyParticipantFormState(): ParticipantEditFormState {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>('Tümü');
   const [searchText, setSearchText] = useState('');
@@ -269,35 +260,17 @@ export default function HomeScreen() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, organizer_id, title, description, location, category, status, event_date, budget')
-        .order('event_date', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      const nextEvents = (data ?? []) as EventItem[];
+      const nextEvents = (await listEvents()) as EventItem[];
       setEvents(nextEvents);
 
       if (currentUser && nextEvents.length > 0) {
-        const { data: participantRows, error: participantRowsError } = await supabase
-          .from('event_participants')
-          .select('event_id, invitation_status')
-          .eq('participant_user_id', currentUser.id)
-          .in(
-            'event_id',
-            nextEvents.map((event) => event.id)
-          );
-
-        if (participantRowsError) {
-          throw participantRowsError;
-        }
+        const participantRows = await listMyParticipantStatuses(
+          nextEvents.map((event) => event.id)
+        );
 
         setParticipantStatusByEventId(
           Object.fromEntries(
-            (participantRows ?? []).map((row) => [row.event_id as string, row.invitation_status as ParticipantStatus])
+            participantRows.map((row) => [row.event_id, row.invitation_status as ParticipantStatus])
           )
         );
       } else {
@@ -316,40 +289,11 @@ export default function HomeScreen() {
     setIsDetailsLoading(true);
 
     try {
-      const [tasksResponse, participantCountResponse, participantsResponse] = await Promise.all([
-        supabase
-          .from('tasks')
-          .select('id, title, description, assigned_to, assigned_to_user_id, due_date, status')
-          .eq('event_id', eventId)
-          .order('due_date', { ascending: true }),
-        supabase.rpc('get_event_participant_count', {
-          input_event_id: eventId,
-        }),
-        isOwner
-          ? supabase
-              .from('event_participants')
-              .select('id, email, invitation_status')
-              .eq('event_id', eventId)
-              .order('created_at', { ascending: true })
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-
-      if (tasksResponse.error) {
-        throw tasksResponse.error;
-      }
-
-      if (participantCountResponse.error) {
-        throw participantCountResponse.error;
-      }
-
-      if (participantsResponse.error) {
-        throw participantsResponse.error;
-      }
-
+      const details = await getEventDetails(eventId);
       setEventDetails({
-        tasks: tasksResponse.data ?? [],
-        participants: participantsResponse.data ?? [],
-        participantCount: participantCountResponse.data ?? 0,
+        tasks: details.tasks as EventTask[],
+        participants: details.participants as EventParticipant[],
+        participantCount: details.participantCount,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Etkinlik detayları yüklenemedi.';
@@ -483,19 +427,14 @@ export default function HomeScreen() {
   }, [activeCategory, events, searchText]);
 
   const handleSignOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    Alert.alert('Çıkış başarısız', error.message);
-    return;
-  }
-  if (Platform.OS === 'web') {
-    window.location.href = '/';
-  } else {
-    // Force reload on native too
-    const { DevSettings } = require('react-native');
-    DevSettings.reload();
-  }
-};
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('Çıkış başarısız', error.message);
+      return;
+    }
+    // Root layout listens to auth changes and will redirect to the auth screen.
+    router.replace('/');
+  };
 
   const handleOpenDetails = async (event: EventItem) => {
     const isOwner = currentUser?.id === event.organizer_id;
@@ -565,7 +504,8 @@ export default function HomeScreen() {
     setBusyEventId(selectedEvent.id);
 
     try {
-      const payload = {
+      const updatedEvent = await updateEvent({
+        id: selectedEvent.id,
         title: editForm.title.trim(),
         description: editForm.description.trim(),
         location: editForm.location.trim(),
@@ -573,23 +513,11 @@ export default function HomeScreen() {
         status: editForm.status,
         event_date: editForm.eventDate.toISOString(),
         budget: parsedBudget,
-      };
+      });
 
-      const { error } = await supabase.from('events').update(payload).eq('id', selectedEvent.id);
-
-      if (error) {
-        throw error;
-      }
-
-      const updatedEvent: EventItem = {
-        id: selectedEvent.id,
-        organizer_id: selectedEvent.organizer_id,
-        ...payload,
-      };
-
-      setEvents((current) => current.map((event) => (event.id === selectedEvent.id ? updatedEvent : event)));
-      setSelectedEvent(updatedEvent);
-      setEditForm(createEditFormState(updatedEvent));
+      setEvents((current) => current.map((event) => (event.id === selectedEvent.id ? updatedEvent as EventItem : event)));
+      setSelectedEvent(updatedEvent as EventItem);
+      setEditForm(createEditFormState(updatedEvent as EventItem));
       setIsEditing(false);
       Alert.alert('Başarılı', 'Etkinlik bilgileri güncellendi.');
     } catch (error) {
@@ -606,11 +534,7 @@ export default function HomeScreen() {
     setBusyEventId(event.id);
 
     try {
-      const { error } = await supabase.from('events').delete().eq('id', event.id);
-
-      if (error) {
-        throw error;
-      }
+      await deleteEventApi(event.id);
 
       setEvents((current) => current.filter((item) => item.id !== event.id));
 
@@ -700,53 +624,30 @@ export default function HomeScreen() {
     setBusyDetailItemId(taskId);
 
     try {
-      let payload:
-        | {
-            title: string;
-            description: string;
-            assigned_to: string;
-            assigned_to_user_id: string;
-            status: TaskStatus;
-            due_date: string;
-          }
-        | {
-            status: TaskStatus;
-            due_date: string;
-          };
+      let updatedTask: EventTask;
 
       if (isOwnTaskOnlyEdit) {
-        payload = {
+        updatedTask = await updateTask({
+          id: taskId,
           status: taskEditForm.status,
           due_date: taskEditForm.dueDate.toISOString(),
-        };
+        });
       } else {
-        const assignedUser = await findUserByEmail(taskEditForm.assignedTo);
-
-        if (!assignedUser) {
-          throw new Error(`"${taskEditForm.assignedTo}" için kullanıcı bulunamadı.`);
-        }
-
-        payload = {
+        updatedTask = await updateTask({
+          id: taskId,
           title: taskEditForm.title.trim(),
           description: taskEditForm.description.trim(),
-          assigned_to: assignedUser.email,
-          assigned_to_user_id: assignedUser.id,
+          assigned_to_email: taskEditForm.assignedTo.trim(),
           status: taskEditForm.status,
           due_date: taskEditForm.dueDate.toISOString(),
-        };
-      }
-
-      const { error } = await supabase.from('tasks').update(payload).eq('id', taskId);
-
-      if (error) {
-        throw error;
+        });
       }
 
       setEventDetails((current) =>
         current
           ? {
               ...current,
-              tasks: current.tasks.map((task) => (task.id === taskId ? { ...task, ...payload } : task)),
+              tasks: current.tasks.map((task) => (task.id === taskId ? updatedTask : task)),
             }
           : current
       );
@@ -767,11 +668,7 @@ export default function HomeScreen() {
     setBusyDetailItemId(taskId);
 
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-
-      if (error) {
-        throw error;
-      }
+      await deleteTask(taskId);
 
       setEventDetails((current) =>
         current
@@ -815,31 +712,14 @@ export default function HomeScreen() {
     setBusyDetailItemId('new-task');
 
     try {
-      const assignedUser = await findUserByEmail(newTaskForm.assignedTo);
-
-      if (!assignedUser) {
-        throw new Error(`"${newTaskForm.assignedTo}" için kullanıcı bulunamadı.`);
-      }
-
-      const payload = {
+      const data = await createTask({
         event_id: selectedEvent.id,
         title: newTaskForm.title.trim(),
         description: newTaskForm.description.trim(),
-        assigned_to: assignedUser.email,
-        assigned_to_user_id: assignedUser.id,
+        assigned_to_email: newTaskForm.assignedTo.trim(),
         status: newTaskForm.status,
         due_date: newTaskForm.dueDate.toISOString(),
-      };
-
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert(payload)
-        .select('id, title, description, assigned_to, assigned_to_user_id, due_date, status')
-        .single();
-
-      if (error) {
-        throw error;
-      }
+      });
 
       setEventDetails((current) =>
         current
@@ -928,39 +808,25 @@ export default function HomeScreen() {
 
     try {
       const existingParticipant = eventDetails?.participants.find((participant) => participant.id === participantId);
-      const participantUser = await findUserByEmail(normalizedEmail);
-
-      if (!participantUser) {
-        throw new Error(`"${normalizedEmail}" için kullanıcı bulunamadı.`);
-      }
-
-      const payload = {
-        email: participantUser.email,
-        participant_user_id: participantUser.id,
+      const updatedParticipant = await updateParticipant({
+        id: participantId,
+        email: normalizedEmail,
         invitation_status: participantEditForm.invitationStatus,
-      };
-
-      const { error } = await supabase.from('event_participants').update(payload).eq('id', participantId);
-
-      if (error) {
-        throw error;
-      }
+      });
 
       setEventDetails((current) =>
         current
           ? {
               ...current,
               participants: current.participants.map((participant) =>
-                participant.id === participantId
-                  ? { ...participant, email: payload.email, invitation_status: payload.invitation_status }
-                  : participant
+                participant.id === participantId ? updatedParticipant : participant
               ),
               participantCount:
                 current.participantCount +
                 ((existingParticipant?.invitation_status === 'declined' ? 0 : 1) ===
-                (payload.invitation_status === 'declined' ? 0 : 1)
+                (updatedParticipant.invitation_status === 'declined' ? 0 : 1)
                   ? 0
-                  : payload.invitation_status === 'declined'
+                  : updatedParticipant.invitation_status === 'declined'
                     ? -1
                     : 1),
             }
@@ -984,11 +850,7 @@ export default function HomeScreen() {
 
     try {
       const existingParticipant = eventDetails?.participants.find((participant) => participant.id === participantId);
-      const { error } = await supabase.from('event_participants').delete().eq('id', participantId);
-
-      if (error) {
-        throw error;
-      }
+      await deleteParticipant(participantId);
 
       setEventDetails((current) =>
         current
@@ -1039,42 +901,11 @@ export default function HomeScreen() {
     setBusyDetailItemId('new-participant');
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) {
-        throw userError;
-      }
-
-      if (!user) {
-        throw new Error('Katılımcı eklemek için giriş yapmanız gerekiyor.');
-      }
-
-      const participantUser = await findUserByEmail(normalizedEmail);
-
-      if (!participantUser) {
-        throw new Error(`"${normalizedEmail}" için kullanıcı bulunamadı.`);
-      }
-
-      const payload = {
+      const data = await createParticipant({
         event_id: selectedEvent.id,
-        email: participantUser.email,
-        participant_user_id: participantUser.id,
+        email: normalizedEmail,
         invitation_status: newParticipantForm.invitationStatus,
-        invited_by: user.id,
-      };
-
-      const { data, error } = await supabase
-        .from('event_participants')
-        .insert(payload)
-        .select('id, email, invitation_status')
-        .single();
-
-      if (error) {
-        throw error;
-      }
+      });
 
       setEventDetails((current) =>
         current
@@ -1121,14 +952,7 @@ export default function HomeScreen() {
     setBusyEventId(event.id);
 
     try {
-      const { error } = await supabase.rpc('respond_to_invitation', {
-        input_event_id: event.id,
-        input_response: response,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await respondToInvitation(event.id, response);
 
       if (response === 'declined') {
         setEvents((current) => current.filter((item) => item.id !== event.id));
@@ -1206,7 +1030,7 @@ export default function HomeScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerTextWrap}>
             <Text style={[styles.welcomeText, { fontSize: Math.round(16 * scale) }]}>
-              Hoş Geldiniz {displayName}
+              Hoş Geldiniz @{displayName}
             </Text>
             <Text style={[styles.title, { fontSize: Math.round(30 * scale) }]}>Etkinlikler</Text>
           </View>
@@ -1339,10 +1163,7 @@ export default function HomeScreen() {
                       <Ionicons name="location-outline" size={16} color="#2563EB" />
                       <Text style={styles.metaText}>{event.location}</Text>
                     </View>
-                    <View style={styles.metaRow}>
-                      <Ionicons name="cash-outline" size={16} color="#2563EB" />
-                      <Text style={styles.metaText}>{formatBudget(event.budget)}</Text>
-                    </View>
+                    {/* Bütçe bilgisi karttan kaldırıldı */}
                   </View>
                 </Pressable>
 

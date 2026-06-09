@@ -48,7 +48,7 @@ export default function RootLayout() {
       router.replace('/(tabs)');
       setTimeout(() => { navigationLock.current = false; }, 1000);
     }
-  }, [session, segments]);
+  }, [router, session, segments]);
 
   if (session === undefined) {
     return (
