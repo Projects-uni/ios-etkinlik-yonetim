@@ -1,0 +1,363 @@
+================================================================================
+           ETKİNLİK YÖNETİM MOBİL UYGULAMASI — FİNAL RAPORU
+================================================================================
+
+Proje Adı       : Etkinlik Yönetim (EtkinlikYonetim)
+Platform        : iOS / Android / Web (Cross-Platform)
+Teknoloji       : React Native (Expo SDK 54), TypeScript
+Backend         : Supabase (PostgreSQL + Edge Functions + Auth)
+Versiyon        : 1.0.0
+
+
+================================================================================
+  1. PROJENİN AMACI VE KAPSAMI
+================================================================================
+
+Bu proje, etkinlik planlama ve yönetim süreçlerini dijitalleştiren bir mobil
+uygulamadır. Kullanıcılar uygulama üzerinden etkinlik oluşturabilir, görev
+atayabilir, katılımcı davet edebilir ve etkinlik süreçlerini uçtan uca
+yönetebilir. Uygulama hem iOS hem Android hem de web üzerinde çalışacak
+şekilde cross-platform olarak geliştirilmiştir.
+
+Temel hedefler:
+  - Kullanıcıların güvenli bir şekilde kayıt olup giriş yapabilmesi
+  - Etkinliklerin kategoriye göre oluşturulması ve yönetilmesi
+  - Etkinliklere görev eklenmesi ve görev atanması
+  - Katılımcı davet sistemi ve davet durumu takibi
+  - Admin paneli ile genel sistem istatistiklerinin izlenmesi
+  - Şifre sıfırlama ve hesap güvenliği işlemleri
+
+
+================================================================================
+  2. UYGULAMA EKRANLARI
+================================================================================
+
+Uygulama toplam 7 ana ekrandan oluşmaktadır. Ekranlar arasında geçiş
+dosya tabanlı yönlendirme (file-based routing) ile expo-router kütüphanesi
+kullanılarak sağlanmaktadır.
+
+2.1. Giriş Yap / Kayıt Ol Ekranı (Auth Screen)
+------------------------------------------------------------------------
+Kullanıcıların e-posta ve şifre ile sisteme giriş yapmasını veya yeni hesap
+oluşturmasını sağlar. Ekranda "Giriş Yap" ve "Kayıt Ol" olmak üzere iki
+sekme bulunur ve kullanıcı bu sekmeler arasında geçiş yapabilir.
+
+Kayıt ol modunda ek olarak "Ad Soyad" alanı gösterilir. Şifre alanında
+göster/gizle butonu mevcuttur. Giriş yap modunda "Şifremi Unuttum" bağlantısı
+yer alır. Supabase Auth servisi ile e-posta/şifre doğrulaması yapılır.
+
+Oturum durumu (session) takip edilir ve kullanıcı giriş yaptığında otomatik
+olarak ana sayfaya yönlendirilir.
+
+2.2. Şifremi Unuttum Ekranı (Forgot Password)
+------------------------------------------------------------------------
+Kullanıcı e-posta adresini girerek şifre sıfırlama bağlantısı talep eder.
+Supabase Auth üzerinden resetPasswordForEmail metodu çağrılır ve kullanıcıya
+e-posta ile sıfırlama linki gönderilir. Sıfırlama bağlantısı Vercel
+üzerinde barındırılan web sayfasına yönlendirme yapar.
+
+2.3. Şifre Sıfırlama Ekranı (Reset Password)
+------------------------------------------------------------------------
+E-posta ile gelen sıfırlama linkinden açılan ekrandır. Kullanıcı yeni
+şifresini ve şifre tekrarını girer. Şifrenin en az 6 karakter olması ve
+iki alanın eşleşmesi kontrol edilir. Başarılı güncelleme sonrasında kullanıcı
+oturumdan çıkarılır ve giriş ekranına yönlendirilir.
+
+Geçersiz veya süresi dolmuş bağlantılar için bilgilendirme mesajı gösterilir.
+
+2.4. Ana Sayfa Ekranı (Home Screen — Etkinlik Listesi)
+------------------------------------------------------------------------
+Uygulamanın ana ekranıdır ve kullanıcının erişebildiği tüm etkinlikleri
+listeler. Üst kısımda kullanıcı adı, çıkış yap butonu ve arama çubuğu
+bulunur. Etkinlikler kategoriye göre filtrelenebilir (Tümü, Konser,
+Konferans, Spor, Festival, Atölye, Diğer).
+
+Her etkinlik kartında başlık, kategori, durum (Taslak, Planlanıyor, Yayında,
+Tamamlandı, İptal), tarih, konum ve bütçe bilgisi görüntülenir. Renk
+kodlaması ile farklı durumlar görsel olarak ayırt edilir.
+
+Etkinlik kartına tıklandığında detay modalı açılır. Etkinlik sahibi olan
+kullanıcı düzenleme ve silme işlemlerini yapabilir. Detay ekranında
+etkinliğin görevleri ve katılımcıları listelenir.
+
+Katılımcı olarak davet edilen kullanıcılar daveti kabul veya reddetme
+işlemi yapabilir. Görev atanmış kullanıcılar kendi görevlerinin durumunu
+güncelleyebilir.
+
+Etkinlik düzenleme modunda tüm alanlar (başlık, açıklama, konum, kategori,
+durum, tarih, bütçe) güncellenebilir. Ayrıca detay ekranı üzerinden yeni
+görev ekleme, mevcut görev düzenleme/silme, yeni katılımcı ekleme ve
+mevcut katılımcı düzenleme/silme işlemleri yapılabilir.
+
+2.5. Etkinlik Oluşturma Ekranı (Event Creation — Explore)
+------------------------------------------------------------------------
+Yeni etkinlik oluşturma formudur. Üç ana bölümden oluşur:
+
+  a) Etkinlik Bilgileri: Etkinlik adı, açıklama, konum, kategori seçimi
+     (Konser, Konferans, Spor, Festival, Atölye, Diğer), durum seçimi,
+     etkinlik tarihi (tarih/saat seçici ile) ve bütçe bilgisi girilir.
+
+  b) Görev Yönetimi: Etkinliğe ait görevler tanımlanır. Her görev için
+     görev adı, açıklama, atanan kişi (e-posta), durum (Beklemede,
+     Devam Ediyor, Tamamlandı) ve bitiş tarihi girilir. Birden fazla
+     görev eklenebilir ve her görev ayrı ayrı silinebilir.
+
+  c) Katılımcı Yönetimi: E-posta adresi girilerek katılımcılar davet
+     listesine eklenir. E-posta doğrulaması yapılır ve tekrarlı kayıt
+     engellenir.
+
+Tüm bilgiler tek bir API çağrısı ile (create-event) sunucuya gönderilir.
+
+2.6. Admin Paneli Ekranı (Admin)
+------------------------------------------------------------------------
+Sadece admin rolüne sahip kullanıcılar tarafından erişilebilir. Kullanıcının
+rolü Supabase user_metadata içindeki "role" alanından kontrol edilir.
+Admin olmayan kullanıcılara erişim engellenir ve bilgilendirme mesajı
+gösterilir.
+
+Admin panelinde yatay kaydırılabilen istatistik kartları bulunur:
+  - Toplam Etkinlik sayısı
+  - Tamamlanan Etkinlik sayısı
+  - Yaklaşan Etkinlik sayısı
+  - Toplam Kullanıcı sayısı
+  - Toplam Görev sayısı
+  - Tamamlanan Görev sayısı
+
+Altında tüm etkinliklerin listesi (başlık, durum, tarih) ve tüm
+kullanıcıların listesi (ad soyad, e-posta) görüntülenir. Admin, herhangi
+bir etkinliği silme yetkisine sahiptir.
+
+
+================================================================================
+  3. API MİMARİSİ (SUPABASE EDGE FUNCTIONS)
+================================================================================
+
+Uygulama, veritabanı ile doğrudan iletişim kurmak yerine Supabase Edge
+Functions (Deno tabanlı sunucusuz fonksiyonlar) üzerinden çalışır. Tüm
+iş mantığı bu fonksiyonlarda yer alır ve istemci tarafı sadece API çağrısı
+yapar. Bu yaklaşım güvenlik, bakım kolaylığı ve iş kurallarının merkezi
+yönetimi açısından tercih edilmiştir.
+
+API Base URL: https://ggrtavmlclgxmhzjuozn.supabase.co/functions/v1
+
+Tüm istekler şu başlıkları gerektirir:
+  - Authorization: Bearer <access_token>  (JWT oturum jetonu)
+  - apikey: <anon_key>                    (Supabase anonim anahtar)
+  - Content-Type: application/json
+
+Toplam 17 adet Edge Function bulunmaktadır:
+
+  No   Fonksiyon Adı                     HTTP Metodu   Açıklama
+  ---  --------------------------------  -----------   ----------------------------
+   1   list-events                       GET           Kullanıcının erişebildiği etkinlikleri listeler
+   2   list-my-participant-statuses      POST          Kullanıcının davet durumlarını getirir
+   3   get-event-details                 POST          Etkinlik detaylarını (görevler, katılımcılar) getirir
+   4   create-event                      POST          Yeni etkinlik oluşturur (görev ve katılımcı ile birlikte)
+   5   update-event                      PATCH         Mevcut etkinliği günceller
+   6   delete-event                      DELETE        Etkinliği ve ilişkili verileri siler
+   7   create-task                       POST          Etkinliğe yeni görev ekler
+   8   update-task                       PATCH         Mevcut görevi günceller
+   9   delete-task                       DELETE        Görevi siler
+  10   create-participant                POST          Etkinliğe katılımcı ekler (davet gönderir)
+  11   update-participant                PATCH         Katılımcı bilgilerini günceller
+  12   delete-participant                DELETE        Katılımcıyı etkinlikten çıkarır
+  13   find-user-by-email                POST          E-posta ile kullanıcı arar
+  14   respond-to-invitation             POST          Katılımcı daveti kabul/reddetme
+  15   admin-stats                       GET           Sistem istatistikleri (sadece admin)
+  16   admin-list-events                 GET           Tüm etkinlikleri listeler (sadece admin)
+  17   admin-list-users                  GET           Tüm kullanıcıları listeler (sadece admin)
+
+İstemci tarafında API çağrıları lib/api/ dizini altında modüler olarak
+düzenlenmiştir:
+  - client.ts      : Ortak HTTP istemcisi (JWT token ekleme, hata yönetimi)
+  - events.ts      : Etkinlik CRUD işlemleri
+  - tasks.ts       : Görev CRUD işlemleri
+  - participants.ts: Katılımcı CRUD işlemleri
+  - admin.ts       : Admin panel API çağrıları
+  - users.ts       : Kullanıcı arama işlemi
+
+Her API çağrısı {data: T} formatında yanıt döner. Hata durumunda
+{error: string} formatında hata mesajı döner.
+
+
+================================================================================
+  4. VERİTABANI YAPISI (POSTGRESQL)
+================================================================================
+
+Veritabanı Supabase üzerinde barındırılan PostgreSQL veritabanıdır. Row
+Level Security (RLS) aktif olup her tablo için güvenlik politikaları
+tanımlanmıştır. Toplam 4 tablo bulunmaktadır:
+
+4.1. profiles Tablosu
+------------------------------------------------------------------------
+Kullanıcı profil bilgilerini tutar. auth.users tablosu ile bire bir
+ilişkilidir. Yeni kullanıcı kaydolduğunda otomatik trigger ile profil
+oluşturulur.
+
+  Sütun       Tip            Açıklama
+  ----------  ------------   --------------------------------
+  id          UUID (PK)      auth.users tablosuna referans (FK)
+  email       TEXT (UNIQUE)  Kullanıcı e-posta adresi
+  full_name   TEXT           Ad soyad (isteğe bağlı)
+  created_at  TIMESTAMPTZ    Oluşturulma tarihi
+
+4.2. events Tablosu
+------------------------------------------------------------------------
+Etkinlik bilgilerini tutar.
+
+  Sütun         Tip              Açıklama
+  ------------  ---------------  --------------------------------
+  id            UUID (PK)        Etkinlik benzersiz kimliği
+  organizer_id  UUID (FK)        Etkinliği oluşturan kullanıcı
+  title         TEXT             Etkinlik başlığı
+  description   TEXT             Etkinlik açıklaması
+  location      TEXT             Etkinlik konumu
+  category      TEXT             Kategori (Konser/Konferans/Spor/Festival/Atölye/Diğer)
+  status        TEXT             Durum (Taslak/Planlanıyor/Yayında/Tamamlandı/İptal)
+  event_date    TIMESTAMPTZ      Etkinlik tarih ve saati
+  budget        NUMERIC(12,2)    Bütçe bilgisi (isteğe bağlı)
+  created_at    TIMESTAMPTZ      Oluşturulma tarihi
+
+4.3. tasks Tablosu
+------------------------------------------------------------------------
+Etkinliklere ait görevleri tutar.
+
+  Sütun               Tip            Açıklama
+  -------------------  ------------  --------------------------------
+  id                   UUID (PK)     Görev benzersiz kimliği
+  event_id             UUID (FK)     İlişkili etkinlik
+  title                TEXT          Görev başlığı
+  description          TEXT          Görev açıklaması
+  due_date             TIMESTAMPTZ   Görev bitiş tarihi
+  assigned_to          TEXT          Atanan kişi e-postası
+  assigned_to_user_id  UUID (FK)     Atanan kullanıcı ID (otomatik eşleme)
+  status               TEXT          Durum (Beklemede/Devam Ediyor/Tamamlandı)
+  created_at           TIMESTAMPTZ   Oluşturulma tarihi
+
+4.4. event_participants Tablosu
+------------------------------------------------------------------------
+Etkinlik katılımcılarını ve davet durumlarını tutar.
+
+  Sütun               Tip            Açıklama
+  -------------------  ------------  --------------------------------
+  id                   UUID (PK)     Katılımcı kaydı benzersiz kimliği
+  event_id             UUID (FK)     İlişkili etkinlik
+  email                TEXT          Katılımcı e-posta adresi
+  participant_user_id  UUID (FK)     Katılımcı kullanıcı ID (otomatik eşleme)
+  invitation_status    TEXT          Davet durumu (invited/accepted/declined)
+  invited_by           UUID (FK)     Davet eden kullanıcı
+  created_at           TIMESTAMPTZ   Oluşturulma tarihi
+
+  UNIQUE kısıtlama: (event_id, email) — aynı etkinliğe aynı e-posta ile
+  tekrarlı katılımcı eklenmesini engeller.
+
+
+================================================================================
+  5. VERİTABANI FONKSİYONLARI VE GÜVENLİK
+================================================================================
+
+Veritabanında 7 adet PostgreSQL fonksiyonu tanımlanmıştır:
+
+  1) sync_profile_from_auth_user()   — Trigger fonksiyonu: auth.users
+     tablosuna kayıt eklendiğinde veya güncellendiğinde profiles tablosunu
+     otomatik senkronize eder.
+
+  2) find_user_by_email(input_email) — E-posta ile kullanıcı arar.
+
+  3) is_event_owner(input_event_id)  — Mevcut kullanıcının etkinlik sahibi
+     olup olmadığını kontrol eder.
+
+  4) is_event_task_assignee(input_event_id) — Mevcut kullanıcıya etkinliğe
+     ait görev atanmış mı kontrol eder.
+
+  5) is_event_invited_or_accepted_participant(input_event_id) — Mevcut
+     kullanıcının etkinliğe davetli veya kabul etmiş katılımcı olup
+     olmadığını kontrol eder.
+
+  6) user_can_access_event(input_event_id) — Yukarıdaki üç kontrolü
+     birleştirerek erişim yetkisi belirler.
+
+  7) respond_to_invitation(input_event_id, input_response) — Katılımcının
+     daveti kabul veya reddetmesini sağlar.
+
+  8) get_event_participant_count(input_event_id) — Reddedilmemiş katılımcı
+     sayısını döner.
+
+Row Level Security (RLS) Politikaları:
+  - profiles: Tüm kimliği doğrulanmış kullanıcılar okuyabilir.
+  - events: Sahip tüm işlemleri yapabilir; paylaşılan kullanıcılar
+    (görev atanmış veya davet edilmiş) sadece görüntüleyebilir.
+  - tasks: Sahip tüm işlemleri yapabilir; atanan kişi sadece kendi
+    görevini güncelleyebilir; davetli katılımcılar görüntüleyebilir.
+  - event_participants: Sahip tüm işlemleri yapabilir; katılımcı kendi
+    davet kaydını görüntüleyebilir.
+
+
+================================================================================
+  6. TEKNOLOJİ YIĞINI VE BAĞIMLILIKLAR
+================================================================================
+
+Frontend:
+  - React Native 0.81.5 (cross-platform mobil framework)
+  - Expo SDK 54 (geliştirme araçları ve derleme yönetimi)
+  - expo-router 6.0.23 (dosya tabanlı yönlendirme)
+  - TypeScript 5.9.2 (tip güvenli geliştirme)
+  - React 19.1.0
+  - expo-linear-gradient (gradient arka planlar)
+  - @react-native-community/datetimepicker (tarih/saat seçici)
+  - @react-native-picker/picker (açılır liste seçici)
+  - react-native-reanimated (animasyonlar)
+  - react-native-gesture-handler (dokunma işleme)
+  - @expo/vector-icons (Ionicons ikon seti)
+
+Backend:
+  - Supabase (BaaS — Backend as a Service)
+  - PostgreSQL (ilişkisel veritabanı)
+  - Supabase Edge Functions — Deno (sunucusuz API fonksiyonları)
+  - Supabase Auth (kimlik doğrulama servisi)
+
+Depolama ve Güvenlik:
+  - @react-native-async-storage/async-storage (yerel depolama — mobil)
+  - expo-secure-store (güvenli anahtar depolama)
+  - JWT tabanlı kimlik doğrulama
+
+Dağıtım:
+  - Vercel (web sürümü barındırma ve şifre sıfırlama sayfası)
+  - Expo Go / EAS Build (mobil test ve derleme)
+
+
+================================================================================
+  7. UYGULAMA AKIŞI
+================================================================================
+
+  1. Kullanıcı uygulamayı açar. Oturum kontrolü yapılır.
+  2. Oturum yoksa → Giriş Yap/Kayıt Ol ekranı gösterilir.
+  3. Oturum varsa → Ana Sayfa (etkinlik listesi) yüklenir.
+  4. Kullanıcı "Etkinlik Ekle" sekmesinden yeni etkinlik oluşturabilir.
+  5. Ana sayfada etkinlikleri arayabilir, kategoriye göre filtreleyebilir.
+  6. Etkinlik kartına dokunarak detayları görüntüleyebilir.
+  7. Etkinlik sahibi: düzenleme, silme, görev ekleme/düzenleme/silme,
+     katılımcı ekleme/düzenleme/silme işlemlerini yapabilir.
+  8. Davetli katılımcı: daveti kabul veya reddedebilir.
+  9. Görev atanan kullanıcı: görevinin durumunu güncelleyebilir.
+  10. Admin: Admin panelinden sistem istatistiklerini ve tüm verileri
+      görüntüleyebilir, etkinlik silebilir.
+  11. Kullanıcı çıkış yaparak oturumunu sonlandırabilir.
+  12. Şifresini unutan kullanıcı e-posta ile sıfırlama linki alabilir.
+
+
+================================================================================
+  8. SONUÇ
+================================================================================
+
+Etkinlik Yönetim uygulaması, etkinlik planlama sürecinin tüm aşamalarını
+kapsayan kapsamlı bir mobil uygulamadır. React Native ve Expo ile
+cross-platform olarak geliştirilmiş, Supabase altyapısı ile güvenli ve
+ölçeklenebilir bir backend üzerine inşa edilmiştir.
+
+Uygulama 7 ekran, 17 API endpoint, 4 veritabanı tablosu ve 8 veritabanı
+fonksiyonu ile tam işlevsel bir etkinlik yönetim sistemi sunmaktadır.
+Row Level Security ile veri güvenliği sağlanmış, role tabanlı erişim
+kontrolü ile admin ve normal kullanıcı yetkileri ayrıştırılmıştır.
+
+================================================================================

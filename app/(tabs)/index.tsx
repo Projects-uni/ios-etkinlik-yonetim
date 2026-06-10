@@ -430,10 +430,7 @@ export default function HomeScreen() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       Alert.alert('Çıkış başarısız', error.message);
-      return;
     }
-    // Root layout listens to auth changes and will redirect to the auth screen.
-    router.replace('/');
   };
 
   const handleOpenDetails = async (event: EventItem) => {
@@ -631,7 +628,7 @@ export default function HomeScreen() {
           id: taskId,
           status: taskEditForm.status,
           due_date: taskEditForm.dueDate.toISOString(),
-        });
+        }) as EventTask;
       } else {
         updatedTask = await updateTask({
           id: taskId,
@@ -640,7 +637,7 @@ export default function HomeScreen() {
           assigned_to_email: taskEditForm.assignedTo.trim(),
           status: taskEditForm.status,
           due_date: taskEditForm.dueDate.toISOString(),
-        });
+        }) as EventTask;
       }
 
       setEventDetails((current) =>
@@ -819,7 +816,7 @@ export default function HomeScreen() {
           ? {
               ...current,
               participants: current.participants.map((participant) =>
-                participant.id === participantId ? updatedParticipant : participant
+                participant.id === participantId ? (updatedParticipant as EventParticipant) : participant
               ),
               participantCount:
                 current.participantCount +

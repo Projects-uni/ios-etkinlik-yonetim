@@ -1,7 +1,7 @@
 import { Session } from '@supabase/supabase-js';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
@@ -34,16 +34,20 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (session === undefined) return;
-    if (navigationLock.current) return;
 
     const inTabsGroup = (segments as string[]).includes('(tabs)');
     const onResetPassword = segments[0] === 'reset-password';
 
+    // Sign-out: always redirect to login
     if (!session && inTabsGroup) {
-      navigationLock.current = true;
-      router.replace('/');
-      setTimeout(() => { navigationLock.current = false; }, 1000);
-    } else if (session && !inTabsGroup && !onResetPassword) {
+      if (Platform.OS === 'web') {
+        window.location.href = '/';
+      } else {
+        navigationLock.current = true;
+        router.replace('/');
+        setTimeout(() => { navigationLock.current = false; }, 1000);
+      }
+    } else if (session && !inTabsGroup && !onResetPassword && !navigationLock.current) {
       navigationLock.current = true;
       router.replace('/(tabs)');
       setTimeout(() => { navigationLock.current = false; }, 1000);
