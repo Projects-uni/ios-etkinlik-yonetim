@@ -53,6 +53,13 @@ export default function AdminScreen() {
   const loadStatsAndLists = useCallback(async () => {
     setIsLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
       const [statsData, eventsData, usersData] = await Promise.all([
         getAdminStats(),
         adminListEvents(),
@@ -64,7 +71,9 @@ export default function AdminScreen() {
       setUsers(usersData);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'İstatistikler yüklenemedi.';
-      Alert.alert('Yükleme hatası', message);
+      if (!message.includes('Oturum bulunamadı')) {
+        Alert.alert('Yükleme hatası', message);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

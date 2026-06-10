@@ -260,6 +260,14 @@ export default function HomeScreen() {
     }
 
     try {
+      // Check session before fetching
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return; // Silently abort if there's no session (user is logging out)
+      }
+
       const nextEvents = (await listEvents()) as EventItem[];
       setEvents(nextEvents);
 
@@ -278,7 +286,10 @@ export default function HomeScreen() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Etkinlikler yüklenemedi.';
-      Alert.alert('Yükleme hatası', message);
+      // Don't show alert if the session is gone (during logout)
+      if (!message.includes('Oturum bulunamadı')) {
+        Alert.alert('Yükleme hatası', message);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -427,9 +438,13 @@ export default function HomeScreen() {
   }, [activeCategory, events, searchText]);
 
   const handleSignOut = async () => {
+    console.log('[Home] handleSignOut clicked');
     const { error } = await supabase.auth.signOut();
     if (error) {
+      console.error('[Home] Sign out failed:', error.message);
       Alert.alert('Çıkış başarısız', error.message);
+    } else {
+      console.log('[Home] supabase.auth.signOut() successful');
     }
   };
 

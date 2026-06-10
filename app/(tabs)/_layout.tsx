@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -6,12 +6,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
+import { Session } from '@supabase/supabase-js';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const checkAdmin = useCallback((user: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
     if (!user) {
@@ -26,12 +28,14 @@ export default function TabLayout() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      checkAdmin(data.user);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      checkAdmin(data.session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      checkAdmin(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      checkAdmin(currentSession?.user ?? null);
     });
 
     return () => {

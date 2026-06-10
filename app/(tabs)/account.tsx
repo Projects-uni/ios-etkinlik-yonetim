@@ -74,18 +74,30 @@ export default function AccountScreen() {
   );
 
   const handleSignOut = async () => {
+    console.log('[Account] handleSignOut clicked');
     if (Platform.OS === 'web') {
       const confirmed = window.confirm('Oturumunuzu kapatmak istediğinize emin misiniz?');
-      if (!confirmed) return;
+      if (!confirmed) {
+        console.log('[Account] Logout cancelled by user (web)');
+        return;
+      }
+      console.log('[Account] Calling supabase.auth.signOut() (web)');
       await supabase.auth.signOut();
+      console.log('[Account] supabase.auth.signOut() finished (web)');
     } else {
       Alert.alert('Çıkış Yap', 'Oturumunuzu kapatmak istediğinize emin misiniz?', [
-        { text: 'Vazgeç', style: 'cancel' },
+        { 
+          text: 'Vazgeç', 
+          style: 'cancel',
+          onPress: () => console.log('[Account] Logout cancelled by user (native)')
+        },
         {
           text: 'Çıkış Yap',
           style: 'destructive',
           onPress: async () => {
+            console.log('[Account] Calling supabase.auth.signOut() (native)');
             await supabase.auth.signOut();
+            console.log('[Account] supabase.auth.signOut() finished (native)');
           },
         },
       ]);
